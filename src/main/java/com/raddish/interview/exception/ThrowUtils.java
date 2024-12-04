@@ -4,8 +4,6 @@ import com.raddish.interview.common.ErrorCode;
 
 /**
  * 抛异常工具类
- *
-
  */
 public class ThrowUtils {
 

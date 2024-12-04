@@ -2,8 +2,6 @@ package com.raddish.interview.constant;
 
 /**
  * 通用常量
- *
-
  */
 public interface CommonConstant {
 

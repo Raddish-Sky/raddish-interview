@@ -44,8 +44,6 @@ import static com.raddish.interview.service.impl.UserServiceImpl.SALT;
 
 /**
  * 用户接口
- *
-
  */
 @RestController
 @RequestMapping("/user")

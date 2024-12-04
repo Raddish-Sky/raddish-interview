@@ -2,8 +2,6 @@ package com.raddish.interview.constant;
 
 /**
  * 用户常量
- *
-
  */
 public interface UserConstant {
 
