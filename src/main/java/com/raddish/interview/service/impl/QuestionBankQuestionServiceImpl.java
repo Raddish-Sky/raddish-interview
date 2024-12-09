@@ -9,11 +9,15 @@ import com.raddish.interview.constant.CommonConstant;
 import com.raddish.interview.exception.ThrowUtils;
 import com.raddish.interview.mapper.QuestionBankQuestionMapper;
 import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionQueryRequest;
+import com.raddish.interview.model.entity.Question;
+import com.raddish.interview.model.entity.QuestionBank;
 import com.raddish.interview.model.entity.QuestionBankQuestion;
 import com.raddish.interview.model.entity.User;
 import com.raddish.interview.model.vo.QuestionBankQuestionVO;
 import com.raddish.interview.model.vo.UserVO;
 import com.raddish.interview.service.QuestionBankQuestionService;
+import com.raddish.interview.service.QuestionBankService;
+import com.raddish.interview.service.QuestionService;
 import com.raddish.interview.service.UserService;
 import com.raddish.interview.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +28,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,6 +42,12 @@ public class QuestionBankQuestionServiceImpl extends ServiceImpl<QuestionBankQue
     @Resource
     private UserService userService;
 
+    @Resource
+    private QuestionService questionService;
+
+    @Resource
+    private QuestionBankService questionBankService;
+
     /**
      * 校验数据
      *
@@ -46,7 +57,17 @@ public class QuestionBankQuestionServiceImpl extends ServiceImpl<QuestionBankQue
     @Override
     public void validQuestionBankQuestion(QuestionBankQuestion questionBankQuestion, boolean add) {
         ThrowUtils.throwIf(questionBankQuestion == null, ErrorCode.PARAMS_ERROR);
-
+        Long questionId = questionBankQuestion.getQuestionId();
+        Long questionBankId = questionBankQuestion.getQuestionBankId();
+        // 题目和题库必须存在
+        if (Objects.nonNull(questionId)) {
+            Question question = questionService.getById(questionId);
+            ThrowUtils.throwIf(question == null, ErrorCode.PARAMS_ERROR, "题目不存在");
+        }
+        if (Objects.nonNull(questionBankId)) {
+            QuestionBank questionBank = questionBankService.getById(questionBankId);
+            ThrowUtils.throwIf(questionBank == null, ErrorCode.PARAMS_ERROR, "题库不存在");
+        }
     }
 
     /**
