@@ -314,4 +314,18 @@ public class UserController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
+
+    /**
+     * 添加用户签到记录
+     *
+     * @param request
+     * @return
+     */
+    @PostMapping("/add/sign_in")
+    public BaseResponse<Boolean> addUserSignIn(HttpServletRequest request) {
+        // 必须登录才能签到
+        User loginUser = userService.getLoginUser(request);
+        boolean res = userService.addUserSignIn(loginUser.getId());
+        return ResultUtils.success(res);
+    }
 }

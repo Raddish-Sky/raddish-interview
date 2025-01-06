@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.raddish.interview.common.ErrorCode;
 import com.raddish.interview.constant.CommonConstant;
+import com.raddish.interview.constant.RedisConstant;
 import com.raddish.interview.exception.BusinessException;
 import com.raddish.interview.mapper.UserMapper;
 import com.raddish.interview.model.dto.user.UserQueryRequest;
@@ -16,13 +17,18 @@ import com.raddish.interview.model.vo.LoginUserVO;
 import com.raddish.interview.model.vo.UserVO;
 import com.raddish.interview.service.UserService;
 import com.raddish.interview.utils.SqlUtils;
+
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RBitSet;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -38,6 +44,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 盐值，混淆密码
      */
     public static final String SALT = "yupi";
+
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -265,5 +274,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
                 sortField);
         return queryWrapper;
+    }
+
+    @Override
+    public boolean addUserSignIn(long userId) {
+        LocalDate now = LocalDate.now();
+
+        String userSignInRedisKey = RedisConstant.getUserSignInRedisKey(now.getYear(), userId);
+        // 获取到 Redis 的 BitSet
+        RBitSet signInBitSet = redissonClient.getBitSet(userSignInRedisKey);
+        // 获取当前日期是一年中的第几天，作为偏移量（从1开始计数）
+        int offset = now.getDayOfYear();
+        // 如果当天没签到，则签到
+        if (!signInBitSet.get(offset)) {
+            signInBitSet.set(offset, true);
+        }
+        return true;
     }
 }
