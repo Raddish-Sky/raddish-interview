@@ -1,5 +1,7 @@
 package com.raddish.interview.model.vo;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.raddish.interview.model.entity.Question;
 import com.raddish.interview.model.entity.QuestionBank;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
@@ -53,6 +55,11 @@ public class QuestionBankVO implements Serializable {
      * 创建用户信息
      */
     private UserVO user;
+
+    /**
+     * 题库关联的题目
+     */
+    private Page<Question> questionPage;
 
     /**
      * 封装类转对象

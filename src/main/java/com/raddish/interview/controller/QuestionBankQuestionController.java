@@ -1,5 +1,7 @@
 package com.raddish.interview.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.raddish.interview.annotation.AuthCheck;
 import com.raddish.interview.common.BaseResponse;
@@ -11,6 +13,7 @@ import com.raddish.interview.exception.BusinessException;
 import com.raddish.interview.exception.ThrowUtils;
 import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionAddRequest;
 import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionQueryRequest;
+import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionRemoveRequest;
 import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionUpdateRequest;
 import com.raddish.interview.model.entity.QuestionBankQuestion;
 import com.raddish.interview.model.entity.User;
@@ -200,4 +203,25 @@ public class QuestionBankQuestionController {
         return ResultUtils.success(questionBankQuestionService.getQuestionBankQuestionVOPage(questionBankQuestionPage, request));
     }
 
+
+    /**
+     * 移除题目题库关联
+     *
+     * @param questionBankQuestionRemoveRequest
+     * @return
+     */
+    @PostMapping("/delete")
+    public BaseResponse<Boolean> deleteQuestionBankQuestion(
+            @RequestBody QuestionBankQuestionRemoveRequest questionBankQuestionRemoveRequest
+    ) {
+        ThrowUtils.throwIf(questionBankQuestionRemoveRequest == null, ErrorCode.PARAMS_ERROR);
+        Long questionBankId = questionBankQuestionRemoveRequest.getQuestionBankId();
+        String questionId = questionBankQuestionRemoveRequest.getQuestionId();
+
+        LambdaQueryWrapper<QuestionBankQuestion> lqw = Wrappers.lambdaQuery(QuestionBankQuestion.class)
+                .eq(QuestionBankQuestion::getQuestionBankId, questionBankId)
+                .eq(QuestionBankQuestion::getQuestionId, questionId);
+        boolean result = questionBankQuestionService.remove(lqw);
+        return ResultUtils.success(result);
+    }
 }

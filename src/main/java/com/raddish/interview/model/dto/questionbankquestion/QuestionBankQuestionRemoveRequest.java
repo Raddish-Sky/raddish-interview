@@ -3,14 +3,13 @@ package com.raddish.interview.model.dto.questionbankquestion;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.List;
 
 /**
- * 创建题库题目关联请求
+ * 删除题库题目关联请求
  *
  */
 @Data
-public class QuestionBankQuestionAddRequest implements Serializable {
+public class QuestionBankQuestionRemoveRequest implements Serializable {
 
     /**
      * 题库 id
@@ -25,4 +24,3 @@ public class QuestionBankQuestionAddRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 }
-

@@ -9,14 +9,17 @@ import com.raddish.interview.common.ResultUtils;
 import com.raddish.interview.constant.UserConstant;
 import com.raddish.interview.exception.BusinessException;
 import com.raddish.interview.exception.ThrowUtils;
+import com.raddish.interview.model.dto.question.QuestionQueryRequest;
 import com.raddish.interview.model.dto.questionbank.QuestionBankAddRequest;
 import com.raddish.interview.model.dto.questionbank.QuestionBankEditRequest;
 import com.raddish.interview.model.dto.questionbank.QuestionBankQueryRequest;
 import com.raddish.interview.model.dto.questionbank.QuestionBankUpdateRequest;
+import com.raddish.interview.model.entity.Question;
 import com.raddish.interview.model.entity.QuestionBank;
 import com.raddish.interview.model.entity.User;
 import com.raddish.interview.model.vo.QuestionBankVO;
 import com.raddish.interview.service.QuestionBankService;
+import com.raddish.interview.service.QuestionService;
 import com.raddish.interview.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -35,6 +38,9 @@ public class QuestionBankController {
 
     @Resource
     private QuestionBankService questionBankService;
+
+    @Resource
+    private QuestionService questionService;
 
     @Resource
     private UserService userService;
@@ -125,17 +131,32 @@ public class QuestionBankController {
     /**
      * 根据 id 获取题库（封装类）
      *
-     * @param id
+     * @param questionBankQueryRequest
      * @return
      */
     @GetMapping("/get/vo")
-    public BaseResponse<QuestionBankVO> getQuestionBankVOById(long id, HttpServletRequest request) {
+    public BaseResponse<QuestionBankVO> getQuestionBankVOById(QuestionBankQueryRequest questionBankQueryRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(questionBankQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        Long id = questionBankQueryRequest.getId();
+        Boolean needQueryQuestionList = questionBankQueryRequest.getNeedQueryQuestionList();
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+
         // 查询数据库
         QuestionBank questionBank = questionBankService.getById(id);
         ThrowUtils.throwIf(questionBank == null, ErrorCode.NOT_FOUND_ERROR);
-        // 获取封装类
-        return ResultUtils.success(questionBankService.getQuestionBankVO(questionBank, request));
+        // 查询题库封装类
+        QuestionBankVO questionBankVO = questionBankService.getQuestionBankVO(questionBank, request);
+
+        // 是否关联查询题库下的题目列表
+        if (needQueryQuestionList) {
+            QuestionQueryRequest questionBankRequest = new QuestionQueryRequest();
+            questionBankRequest.setQuestionBankId(id);
+            Page<Question> questionPage = questionService.listQuestionByPage(questionBankRequest);
+            questionBankVO.setQuestionPage(questionPage);
+        }
+
+
+        return ResultUtils.success(questionBankVO);
     }
 
     /**
