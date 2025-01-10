@@ -19,11 +19,13 @@ import com.raddish.interview.service.UserService;
 import com.raddish.interview.utils.SqlUtils;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Year;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import javax.swing.text.StyledEditorKit;
+
 import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 import org.apache.commons.lang3.StringUtils;
@@ -47,6 +49,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Resource
     private RedissonClient redissonClient;
+    private int totalDays;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -290,5 +293,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             signInBitSet.set(offset, true);
         }
         return true;
+    }
+
+    /**
+     * 获取用户某个年份的签到记录
+     *
+     * @param userId
+     * @param year
+     * @return 返回签到的时哪些天
+     */
+    @Override
+    public List<Integer> getUserSignInRecord(long userId, Integer year) {
+        if (Objects.isNull(year)) {
+            LocalDate now = LocalDate.now();
+            year = now.getYear();
+        }
+        String key = RedisConstant.getUserSignInRedisKey(year, userId);
+        RBitSet signInBitSet = redissonClient.getBitSet(key);
+        // 优化一：注意，把 bitSet 缓存到内存中，不然后面如果直接 使用 bitSet.get(i + 1) 会向 Redis 发送约365次请求
+        BitSet bitSet = signInBitSet.asBitSet();
+
+        totalDays = Year.of(year).length();
+        List<Integer> res = new ArrayList<>();
+        // for (int i = 0; i < totalDays; i++) {
+        //     if (bitSet.get(i + 1)) {
+        //         res.add(i + 1);
+        //     }
+        // }
+
+        // 优化二：使用 BitSet 自带方法计算，比使用 for 循环效率更高
+        int idx = bitSet.nextSetBit(0);
+        while (idx >= 0) {
+            res.add(idx);
+            idx = bitSet.nextSetBit(idx + 1);
+        }
+        return res;
     }
 }
