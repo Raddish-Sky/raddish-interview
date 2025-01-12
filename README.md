@@ -170,3 +170,8 @@ String upperDataKey = "UserComment";
 ```
 
 生成代码后，可以移动到实际项目中，并且按照 `// todo` 注释的提示来针对自己的业务需求进行修改。
+
+
+### 相关链接
+> ElasticSearch 后台： http://localhost:5601 <br>
+> Swagger + Knife4j 接口文档： http://localhost:8101/api/doc.html <br>

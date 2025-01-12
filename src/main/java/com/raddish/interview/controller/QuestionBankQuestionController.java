@@ -11,21 +11,23 @@ import com.raddish.interview.common.ResultUtils;
 import com.raddish.interview.constant.UserConstant;
 import com.raddish.interview.exception.BusinessException;
 import com.raddish.interview.exception.ThrowUtils;
-import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionAddRequest;
-import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionQueryRequest;
-import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionRemoveRequest;
-import com.raddish.interview.model.dto.questionbankquestion.QuestionBankQuestionUpdateRequest;
+import com.raddish.interview.model.dto.questionbankquestion.*;
 import com.raddish.interview.model.entity.QuestionBankQuestion;
 import com.raddish.interview.model.entity.User;
 import com.raddish.interview.model.vo.QuestionBankQuestionVO;
 import com.raddish.interview.service.QuestionBankQuestionService;
 import com.raddish.interview.service.UserService;
+import com.raddish.interview.service.impl.QuestionBankQuestionServiceImpl;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * 题目题库关联接口
@@ -41,6 +43,8 @@ public class QuestionBankQuestionController {
 
     @Resource
     private UserService userService;
+    @Autowired
+    private QuestionBankQuestionServiceImpl questionBankQuestionServiceImpl;
 
     // region 增删改查
 
@@ -210,7 +214,7 @@ public class QuestionBankQuestionController {
      * @param questionBankQuestionRemoveRequest
      * @return
      */
-    @PostMapping("/delete")
+    @PostMapping("/remove")
     public BaseResponse<Boolean> deleteQuestionBankQuestion(
             @RequestBody QuestionBankQuestionRemoveRequest questionBankQuestionRemoveRequest
     ) {
@@ -223,5 +227,42 @@ public class QuestionBankQuestionController {
                 .eq(QuestionBankQuestion::getQuestionId, questionId);
         boolean result = questionBankQuestionService.remove(lqw);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 批量添加题目到题库（仅管理员可用）
+     *
+     * @param questionBankQuestionBatchAddRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/add/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> addQuestionBankQuestionBatch(
+            @RequestBody QuestionBankQuestionBatchAddRequest questionBankQuestionBatchAddRequest,
+            HttpServletRequest request) {
+        ThrowUtils.throwIf(Objects.isNull(questionBankQuestionBatchAddRequest), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        questionBankQuestionService.batchAddQuestionsToBank(questionBankQuestionBatchAddRequest.getQuestionIdList(),
+                questionBankQuestionBatchAddRequest.getQuestionBankId(), loginUser);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 批量从题库移除题目（仅管理员可用）
+     *
+     * @param questionBankQuestionBatchRemoveRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/remove/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> removeQuestionBankQuestionBatch(
+            @RequestBody QuestionBankQuestionBatchAddRequest questionBankQuestionBatchRemoveRequest,
+            HttpServletRequest request) {
+        ThrowUtils.throwIf(Objects.isNull(questionBankQuestionBatchRemoveRequest), ErrorCode.PARAMS_ERROR);
+        questionBankQuestionService.batchRemoveQuestionsFromBank(questionBankQuestionBatchRemoveRequest.getQuestionIdList(),
+                questionBankQuestionBatchRemoveRequest.getQuestionBankId());
+        return ResultUtils.success(true);
     }
 }

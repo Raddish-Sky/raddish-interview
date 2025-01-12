@@ -7,7 +7,6 @@ import java.util.List;
 
 /**
  * 更新题库题目关联请求
- *
  */
 @Data
 public class QuestionBankQuestionUpdateRequest implements Serializable {

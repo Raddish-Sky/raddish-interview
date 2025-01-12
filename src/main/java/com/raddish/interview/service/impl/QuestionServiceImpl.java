@@ -12,7 +12,11 @@ import com.raddish.interview.common.ResultUtils;
 import com.raddish.interview.constant.CommonConstant;
 import com.raddish.interview.exception.ThrowUtils;
 import com.raddish.interview.mapper.QuestionMapper;
+import com.raddish.interview.model.dto.post.PostEsDTO;
+import com.raddish.interview.model.dto.post.PostQueryRequest;
+import com.raddish.interview.model.dto.question.QuestionEsDTO;
 import com.raddish.interview.model.dto.question.QuestionQueryRequest;
+import com.raddish.interview.model.entity.Post;
 import com.raddish.interview.model.entity.Question;
 import com.raddish.interview.model.entity.QuestionBankQuestion;
 import com.raddish.interview.model.entity.User;
@@ -26,7 +30,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.sort.SortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import javax.annotation.Resource;
@@ -47,6 +64,9 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Resource
     private QuestionBankQuestionService questionBankQuestionService;
+
+    @Resource
+    private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
     /**
      * 校验数据
@@ -215,5 +235,117 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
                 this.getQueryWrapper(questionQueryRequest));
         return questionPage;
     }
+
+    /**
+     * 从 ES 中查询 题目
+     *
+     * @param questionQueryRequest
+     * @return
+     */
+    @Override
+    public Page<Question> searchFromEs(QuestionQueryRequest questionQueryRequest) {
+        Long id = questionQueryRequest.getId();
+        Long notId = questionQueryRequest.getNotId();
+        String searchText = questionQueryRequest.getSearchText();
+        String title = questionQueryRequest.getTitle();
+        String content = questionQueryRequest.getContent();
+        List<String> tagList = questionQueryRequest.getTags();
+        List<String> orTagList = questionQueryRequest.getTags();
+        Long userId = questionQueryRequest.getUserId();
+        // es 起始页为 0
+        long current = questionQueryRequest.getCurrent() - 1;
+        long pageSize = questionQueryRequest.getPageSize();
+        String sortField = questionQueryRequest.getSortField();
+        String sortOrder = questionQueryRequest.getSortOrder();
+        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery();
+        // 过滤
+        boolQueryBuilder.filter(QueryBuilders.termQuery("isDelete", 0));
+        if (id != null) {
+            boolQueryBuilder.filter(QueryBuilders.termQuery("id", id));
+        }
+        if (notId != null) {
+            boolQueryBuilder.mustNot(QueryBuilders.termQuery("id", notId));
+        }
+        if (userId != null) {
+            boolQueryBuilder.filter(QueryBuilders.termQuery("userId", userId));
+        }
+        // 必须包含所有标签
+        if (CollUtil.isNotEmpty(tagList)) {
+            for (String tag : tagList) {
+                boolQueryBuilder.filter(QueryBuilders.termQuery("tags", tag));
+            }
+        }
+        // 包含任何一个标签即可
+        if (CollUtil.isNotEmpty(orTagList)) {
+            BoolQueryBuilder orTagBoolQueryBuilder = QueryBuilders.boolQuery();
+            for (String tag : orTagList) {
+                orTagBoolQueryBuilder.should(QueryBuilders.termQuery("tags", tag));
+            }
+            orTagBoolQueryBuilder.minimumShouldMatch(1);
+            boolQueryBuilder.filter(orTagBoolQueryBuilder);
+        }
+        // 按关键词检索
+        if (StringUtils.isNotBlank(searchText)) {
+            boolQueryBuilder.should(QueryBuilders.matchQuery("title", searchText));
+            boolQueryBuilder.should(QueryBuilders.matchQuery("description", searchText));
+            boolQueryBuilder.should(QueryBuilders.matchQuery("content", searchText));
+            boolQueryBuilder.minimumShouldMatch(1);
+        }
+        // 按标题检索
+        if (StringUtils.isNotBlank(title)) {
+            boolQueryBuilder.should(QueryBuilders.matchQuery("title", title));
+            boolQueryBuilder.minimumShouldMatch(1);
+        }
+        // 按内容检索
+        if (StringUtils.isNotBlank(content)) {
+            boolQueryBuilder.should(QueryBuilders.matchQuery("content", content));
+            boolQueryBuilder.minimumShouldMatch(1);
+        }
+        // 排序
+        SortBuilder<?> sortBuilder = SortBuilders.scoreSort();
+        if (StringUtils.isNotBlank(sortField)) {
+            sortBuilder = SortBuilders.fieldSort(sortField);
+            sortBuilder.order(CommonConstant.SORT_ORDER_ASC.equals(sortOrder) ? SortOrder.ASC : SortOrder.DESC);
+        }
+        // 分页
+        PageRequest pageRequest = PageRequest.of((int) current, (int) pageSize);
+        // 构造查询
+        NativeSearchQuery searchQuery = new NativeSearchQueryBuilder().withQuery(boolQueryBuilder)
+                .withPageable(pageRequest).withSorts(sortBuilder).build();
+        SearchHits<QuestionEsDTO> searchHits = elasticsearchRestTemplate.search(searchQuery, QuestionEsDTO.class);
+        // 复用 MySQL / MyBatis plus 的分页对象，封装返回结果
+        Page<Question> page = new Page<>();
+        page.setTotal(searchHits.getTotalHits());
+        List<Question> resourceList = new ArrayList<>();
+        if (searchHits.hasSearchHits()) {
+            List<SearchHit<QuestionEsDTO>> searchHitList = searchHits.getSearchHits();
+            for (SearchHit<QuestionEsDTO> questionEsDTOSearchHit : searchHitList) {
+                resourceList.add(QuestionEsDTO.dtoToObj(questionEsDTOSearchHit.getContent()));
+            }
+        }
+        page.setRecords(resourceList);
+        return page;
+    }
+
+    /**
+     * 批量删除题目
+     *
+     * @param questionIdList
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchDeleteQuestions(List<Long> questionIdList) {
+        ThrowUtils.throwIf(Objects.isNull(questionIdList), ErrorCode.PARAMS_ERROR, "要删除的题目列表不能为空");
+        for (Long questionId : questionIdList) {
+            boolean result = this.removeById(questionId);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "删除题目失败");
+            // 移除题目题库关系
+            LambdaQueryWrapper<QuestionBankQuestion> lqw = Wrappers.lambdaQuery(QuestionBankQuestion.class)
+                    .eq(QuestionBankQuestion::getQuestionId, questionId);
+            result = questionBankQuestionService.remove(lqw);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "删除题目题库关联关系失败");
+        }
+    }
+
 
 }

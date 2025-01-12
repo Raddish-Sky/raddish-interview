@@ -13,10 +13,7 @@ import com.raddish.interview.common.ResultUtils;
 import com.raddish.interview.constant.UserConstant;
 import com.raddish.interview.exception.BusinessException;
 import com.raddish.interview.exception.ThrowUtils;
-import com.raddish.interview.model.dto.question.QuestionAddRequest;
-import com.raddish.interview.model.dto.question.QuestionEditRequest;
-import com.raddish.interview.model.dto.question.QuestionQueryRequest;
-import com.raddish.interview.model.dto.question.QuestionUpdateRequest;
+import com.raddish.interview.model.dto.question.*;
 import com.raddish.interview.model.entity.Question;
 import com.raddish.interview.model.entity.User;
 import com.raddish.interview.model.vo.QuestionVO;
@@ -24,7 +21,9 @@ import com.raddish.interview.service.QuestionBankQuestionService;
 import com.raddish.interview.service.QuestionService;
 import com.raddish.interview.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import net.bytebuddy.implementation.bytecode.Throw;
 import org.apache.commons.collections4.CollectionUtils;
+import org.aspectj.weaver.patterns.TypePatternQuestions;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 import com.raddish.interview.model.entity.QuestionBankQuestion;
@@ -249,6 +248,26 @@ public class QuestionController {
         // 操作数据库
         boolean result = questionService.updateById(question);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+
+    @PostMapping("/search/page/vo")
+    public BaseResponse<Page<QuestionVO>> searchQuestionVOByOage(@RequestBody QuestionQueryRequest questionQueryRequest,
+                                                                 HttpServletRequest request) {
+        long size = questionQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(size > 200, ErrorCode.PARAMS_ERROR);
+        Page<Question> questionPage = questionService.searchFromEs(questionQueryRequest);
+        return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+    }
+
+
+    @PostMapping("/delete/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> deleteBatchQuestions(@RequestBody QuestionBatchDeleteRequest questionBatchDeleteRequest) {
+        ThrowUtils.throwIf(Objects.isNull(questionBatchDeleteRequest), ErrorCode.PARAMS_ERROR);
+        questionService.batchDeleteQuestions(questionBatchDeleteRequest.getQuestionIdList());
         return ResultUtils.success(true);
     }
 }
